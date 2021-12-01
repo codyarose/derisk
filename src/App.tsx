@@ -1,23 +1,32 @@
 import { FormControl, FormLabel } from "@chakra-ui/form-control"
-import { Box, Container, Flex, Grid, Heading, VStack } from "@chakra-ui/layout"
+import {
+	Box,
+	Container,
+	Flex,
+	Grid,
+	Heading,
+	VStack,
+	Text,
+} from "@chakra-ui/layout"
 import { Input, InputGroup, InputRightAddon } from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 
 function App() {
 	const [value, setValue] = useState(0)
 	const [transactionFee, setTransactionFee] = useState(0)
-	const [royalties, setRoyalties] = useState(0)
+	const [royalty, setroyalty] = useState(0)
 	const [platformFee, setPlatformFee] = useState(2.5)
 	const [deriskAmount, setDeriskAmount] = useState(0)
 
 	useEffect(() => {
 		if (value && transactionFee) {
-			const totalCost = value + transactionFee
-			const totalFees = ((platformFee + royalties) / 100) * totalCost
-			const finalAmount = Number((totalCost + totalFees).toFixed(4))
-			setDeriskAmount(finalAmount || 0)
+			const totalCost = (value || 0) + (transactionFee || 0)
+			const feesOffset = (100 - (platformFee + royalty)) / 100
+			const finalAmount = Number((totalCost / feesOffset).toFixed(4))
+
+			setDeriskAmount(finalAmount)
 		}
-	}, [value, transactionFee, royalties, platformFee])
+	}, [value, transactionFee, royalty, platformFee])
 
 	return (
 		<Container h='100vh' display='flex' alignItems='center'>
@@ -54,14 +63,14 @@ function App() {
 					</FormControl>
 
 					<FormControl>
-						<FormLabel>Royalties</FormLabel>
+						<FormLabel>Royalty</FormLabel>
 						<InputGroup>
 							<Input
 								type='number'
-								name='royalties'
+								name='royalty'
 								min={0}
 								onChange={(e) =>
-									setRoyalties(e.currentTarget.valueAsNumber)
+									setroyalty(e.currentTarget.valueAsNumber)
 								}
 							/>
 							<InputRightAddon>%</InputRightAddon>
@@ -94,6 +103,10 @@ function App() {
 					<Box>
 						<Heading size='md'>Derisk amount:</Heading>
 						<Heading size='xl'>{deriskAmount}</Heading>
+						<Text fontSize='sm'>
+							List for this amount to recoup purchase cost
+							including fees
+						</Text>
 					</Box>
 				</Flex>
 			</Grid>
