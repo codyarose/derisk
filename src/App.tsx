@@ -1,4 +1,5 @@
 import { FormControl, FormLabel } from "@chakra-ui/form-control"
+import { MoonIcon, SunIcon } from "@chakra-ui/icons"
 import {
 	Box,
 	Container,
@@ -8,7 +9,13 @@ import {
 	VStack,
 	Text,
 } from "@chakra-ui/layout"
-import { Input, InputGroup, InputRightAddon } from "@chakra-ui/react"
+import {
+	Button,
+	Input,
+	InputGroup,
+	InputRightAddon,
+	useColorMode,
+} from "@chakra-ui/react"
 import { useEffect, useState } from "react"
 
 function App() {
@@ -17,6 +24,7 @@ function App() {
 	const [royalty, setroyalty] = useState(0)
 	const [platformFee, setPlatformFee] = useState(2.5)
 	const [deriskAmount, setDeriskAmount] = useState(0)
+	const { colorMode, toggleColorMode } = useColorMode()
 
 	useEffect(() => {
 		if (value && transactionFee) {
@@ -30,6 +38,15 @@ function App() {
 
 	return (
 		<Container h='100vh' display='flex' alignItems='center'>
+			<Button
+				onClick={toggleColorMode}
+				pos='absolute'
+				top={0}
+				right={0}
+				m={3}
+			>
+				{colorMode === "light" ? <MoonIcon /> : <SunIcon />}
+			</Button>
 			<Grid gridTemplateColumns={["1fr", "1fr 1fr"]} gridGap='6' w='100%'>
 				<VStack align='flex-start'>
 					<FormControl>
