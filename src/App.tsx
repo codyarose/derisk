@@ -10,10 +10,8 @@ import {
 	Text,
 } from "@chakra-ui/layout"
 import {
-	Alert,
-	AlertIcon,
 	Button,
-	Fade,
+	createStandaloneToast,
 	Input,
 	InputGroup,
 	Stat,
@@ -22,7 +20,7 @@ import {
 	StatNumber,
 	useColorMode,
 } from "@chakra-ui/react"
-import { ChangeEvent, useState } from "react"
+import { ChangeEvent, useEffect, useState } from "react"
 import { useQuery } from "react-query"
 import { utils as ethersUtils, constants as ethersConstants } from "ethers"
 
@@ -31,6 +29,7 @@ const ETH_SYMBOL = ethersConstants.EtherSymbol
 
 function App() {
 	const { colorMode, toggleColorMode } = useColorMode()
+	const toast = createStandaloneToast()
 	const [txHash, setTxHash] = useState("")
 
 	const { data: txByHash, isLoading: isTxByHashLoading } = useQuery(
@@ -93,12 +92,24 @@ function App() {
 		)
 	}
 
+	useEffect(() => {
+		if (txByHash?.error?.message.length) {
+			toast({
+				title: "An error occurred.",
+				description: txByHash.error.message,
+				status: "error",
+				duration: 9000,
+				isClosable: true,
+			})
+		}
+	}, [txByHash?.error?.message])
+
 	return (
 		<Container
 			display='flex'
 			justifyContent='center'
 			flexDir='column'
-			py='10'
+			py={["3rem", "5rem"]}
 		>
 			<Button
 				onClick={toggleColorMode}
@@ -110,15 +121,6 @@ function App() {
 				{colorMode === "light" ? <MoonIcon /> : <SunIcon />}
 			</Button>
 
-			<Fade in={Boolean(txByHash?.error?.message.length)}>
-				<Alert status='error' mb={3}>
-					<AlertIcon />
-					<Box>
-						<Box>There was an error processing your request.</Box>
-						Error: {txByHash?.error?.message}
-					</Box>
-				</Alert>
-			</Fade>
 			<Grid gridTemplateColumns={["1fr", "1fr 1fr"]} gridGap='6' w='100%'>
 				<VStack align='flex-start'>
 					<form onSubmit={handleTxSubmit}>
@@ -128,7 +130,7 @@ function App() {
 								<Input
 									name='txHash'
 									maxLength={66}
-									minLength={66}
+									// minLength={66}
 								/>
 								<Button
 									type='submit'
