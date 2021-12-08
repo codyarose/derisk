@@ -10,34 +10,96 @@ import {
 	Text,
 } from "@chakra-ui/layout"
 import {
+	Alert,
+	AlertIcon,
 	Button,
+	Fade,
 	Input,
 	InputGroup,
-	InputRightAddon,
+	Stat,
+	StatGroup,
+	StatLabel,
+	StatNumber,
 	useColorMode,
 } from "@chakra-ui/react"
-import { useEffect, useState } from "react"
+import { ChangeEvent, useState } from "react"
+import { useQuery } from "react-query"
+import { utils as ethersUtils, constants as ethersConstants } from "ethers"
+
+const API_KEY = "FGTV43W5R7J9XW6JTITDED34FITIPDFB95"
+const ETH_SYMBOL = ethersConstants.EtherSymbol
 
 function App() {
-	const [value, setValue] = useState(0)
-	const [transactionFee, setTransactionFee] = useState(0)
-	const [royalty, setroyalty] = useState(0)
-	const [platformFee, setPlatformFee] = useState(2.5)
-	const [deriskAmount, setDeriskAmount] = useState(0)
 	const { colorMode, toggleColorMode } = useColorMode()
+	const [txHash, setTxHash] = useState("")
 
-	useEffect(() => {
-		if (value && transactionFee) {
-			const totalCost = (value || 0) + (transactionFee || 0)
-			const feesOffset = (100 - (platformFee + royalty)) / 100
-			const finalAmount = Number((totalCost / feesOffset).toFixed(4))
-
-			setDeriskAmount(finalAmount)
+	const { data: txByHash, isLoading: isTxByHashLoading } = useQuery(
+		["txByHash", txHash],
+		() =>
+			fetch(
+				`https://api.etherscan.io/api?module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${API_KEY}`
+			).then((res) => res.json()),
+		{
+			enabled: Boolean(txHash),
 		}
-	}, [value, transactionFee, royalty, platformFee])
+	)
+
+	const { data: txReceipt, isLoading: isTxReceiptLoading } = useQuery(
+		["txReceipt", txHash],
+		() =>
+			fetch(
+				`https://api.etherscan.io/api?module=proxy&action=eth_getTransactionReceipt&txhash=${txHash}&apikey=${API_KEY}`
+			).then((res) => res.json()),
+		{
+			enabled: Boolean(txHash),
+		}
+	)
+
+	const contractAddress = txByHash?.result?.to ?? ""
+	const { data: collectionData } = useQuery(
+		["collection", contractAddress],
+		() =>
+			fetch(
+				`https://api.opensea.io/api/v1/asset_contract/${contractAddress}`
+			).then((res) => res.json()),
+		{
+			enabled: Boolean(contractAddress),
+		}
+	)
+
+	const txValue = txByHash?.result
+		? Number(ethersUtils.formatEther(txByHash.result.value))
+		: 0
+	const gasUsed = txReceipt?.result ? Number(txReceipt.result.gasUsed) : 0
+	const gasPrice = txReceipt?.result
+		? Number(ethersUtils.formatEther(txReceipt.result.effectiveGasPrice))
+		: 0
+	const txFee = gasUsed * gasPrice
+	const collectionRoyalty =
+		(collectionData?.dev_seller_fee_basis_points || 0) / 100
+	const osFee = (collectionData?.opensea_seller_fee_basis_points || 0) / 100
+
+	const deriskAmount = (
+		(txValue + txFee) /
+		((100 - (osFee + collectionRoyalty)) / 100)
+	).toFixed(4)
+
+	const handleTxSubmit = (e: ChangeEvent<HTMLFormElement>) => {
+		e.preventDefault()
+
+		setTxHash(
+			(e.currentTarget.elements.namedItem("txHash") as HTMLInputElement)
+				.value
+		)
+	}
 
 	return (
-		<Container h='100vh' display='flex' alignItems='center'>
+		<Container
+			display='flex'
+			justifyContent='center'
+			flexDir='column'
+			py='10'
+		>
 			<Button
 				onClick={toggleColorMode}
 				pos='absolute'
@@ -47,70 +109,58 @@ function App() {
 			>
 				{colorMode === "light" ? <MoonIcon /> : <SunIcon />}
 			</Button>
+
+			<Fade in={Boolean(txByHash?.error?.message.length)}>
+				<Alert status='error' mb={3}>
+					<AlertIcon />
+					<Box>
+						<Box>There was an error processing your request.</Box>
+						Error: {txByHash?.error?.message}
+					</Box>
+				</Alert>
+			</Fade>
 			<Grid gridTemplateColumns={["1fr", "1fr 1fr"]} gridGap='6' w='100%'>
 				<VStack align='flex-start'>
-					<FormControl>
-						<FormLabel>Value</FormLabel>
-						<InputGroup>
-							<Input
-								type='number'
-								name='value'
-								min={0}
-								onChange={(e) =>
-									setValue(e.currentTarget.valueAsNumber)
-								}
-							/>
-						</InputGroup>
-					</FormControl>
-
-					<FormControl>
-						<FormLabel>Transaction Fee</FormLabel>
-						<InputGroup>
-							<Input
-								type='number'
-								name='transactionFee'
-								min={0}
-								onChange={(e) =>
-									setTransactionFee(
-										e.currentTarget.valueAsNumber
-									)
-								}
-							/>
-						</InputGroup>
-					</FormControl>
-
-					<FormControl>
-						<FormLabel>Royalty</FormLabel>
-						<InputGroup>
-							<Input
-								type='number'
-								name='royalty'
-								min={0}
-								onChange={(e) =>
-									setroyalty(e.currentTarget.valueAsNumber)
-								}
-							/>
-							<InputRightAddon>%</InputRightAddon>
-						</InputGroup>
-					</FormControl>
-
-					<FormControl>
-						<FormLabel>Platform Fee</FormLabel>
-						<InputGroup>
-							<Input
-								type='number'
-								name='platformFee'
-								defaultValue={platformFee}
-								min={0}
-								onChange={(e) =>
-									setPlatformFee(
-										e.currentTarget.valueAsNumber
-									)
-								}
-							/>
-							<InputRightAddon>%</InputRightAddon>
-						</InputGroup>
-					</FormControl>
+					<form onSubmit={handleTxSubmit}>
+						<FormControl mb='3'>
+							<FormLabel>Transaction hash</FormLabel>
+							<InputGroup gridGap='1'>
+								<Input name='txHash' />
+								<Button
+									type='submit'
+									isLoading={
+										isTxByHashLoading || isTxReceiptLoading
+									}
+								>
+									Submit
+								</Button>
+							</InputGroup>
+						</FormControl>
+					</form>
+					<StatGroup flexDir='column' gridGap='3'>
+						<Stat>
+							<StatLabel>Value</StatLabel>
+							<StatNumber>
+								{`${txValue} ${ETH_SYMBOL}`}
+							</StatNumber>
+						</Stat>
+						<Stat>
+							<StatLabel>Transaction fee</StatLabel>
+							<StatNumber wordBreak='keep-all'>{`${txFee.toFixed(
+								4
+							)} ${ETH_SYMBOL}`}</StatNumber>
+						</Stat>
+						<Stat>
+							<StatLabel>
+								{`${collectionData?.name} `}Royalty
+							</StatLabel>
+							<StatNumber>{collectionRoyalty}%</StatNumber>
+						</Stat>
+						<Stat>
+							<StatLabel>Platform fee</StatLabel>
+							<StatNumber>{osFee}%</StatNumber>
+						</Stat>
+					</StatGroup>
 				</VStack>
 				<Flex
 					justifyContent='center'
