@@ -125,7 +125,11 @@ function App() {
 						<FormControl mb='3'>
 							<FormLabel>Transaction hash</FormLabel>
 							<InputGroup gridGap='1'>
-								<Input name='txHash' />
+								<Input
+									name='txHash'
+									maxLength={66}
+									minLength={66}
+								/>
 								<Button
 									type='submit'
 									isLoading={
