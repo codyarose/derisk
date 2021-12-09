@@ -54,7 +54,11 @@ function App() {
 		}
 	)
 
-	const contractAddress = txByHash?.result?.to ?? ""
+	// In the logs array the item with `data: "0x"` appears to contain the original collection's contract address
+	const contractAddress = txReceipt?.result.logs.find(
+		(item: any) => item.data === "0x"
+	).address
+
 	const { data: collectionData } = useQuery(
 		["collection", contractAddress],
 		() =>
