@@ -1,4 +1,4 @@
-import { FormControl, FormLabel } from "@chakra-ui/form-control"
+import { FormControl } from "@chakra-ui/form-control"
 import { MoonIcon, SunIcon } from "@chakra-ui/icons"
 import {
 	Box,
@@ -22,6 +22,8 @@ import {
 	StatNumber,
 	useColorMode,
 	Image,
+	InputRightAddon,
+	Fade,
 } from "@chakra-ui/react"
 import { ChangeEvent, useEffect, useRef, useState } from "react"
 import { useQuery } from "react-query"
@@ -34,7 +36,7 @@ function App() {
 	const { colorMode, toggleColorMode } = useColorMode()
 	const toast = createStandaloneToast()
 	const [txHash, setTxHash] = useState("")
-	const inputRef = useRef<HTMLInputElement | null>(null)
+	const [profit, setProfit] = useState(0)
 
 	const { data: txByHash, isLoading: isLoadingTxByHash } = useQuery(
 		["txByHash", txHash],
@@ -59,9 +61,9 @@ function App() {
 	)
 
 	// In the logs array the item with `data: "0x"` appears to contain the original collection's contract address
-	const contractAddress = txReceipt?.result.logs.find(
+	const contractAddress = txReceipt?.result?.logs.find(
 		(item: any) => item.data === "0x"
-	).address
+	)?.address
 
 	const { data: collectionData } = useQuery<CollectionData>(
 		["collection", contractAddress],
@@ -109,24 +111,41 @@ function App() {
 	const handleTxSubmit = (e: ChangeEvent<HTMLFormElement>) => {
 		e.preventDefault()
 
-		setTxHash(
-			(e.currentTarget.elements.namedItem("txHash") as HTMLInputElement)
-				.value
-		)
+		const newTxHash = (
+			e.currentTarget.elements.namedItem("txHash") as HTMLInputElement
+		).value
 
-		inputRef.current?.focus()
+		setTxHash((prevTxHash) => {
+			if (prevTxHash === newTxHash) {
+				return prevTxHash
+			}
+
+			setProfit(0)
+			return newTxHash
+		})
+
+		e.currentTarget.focus()
 	}
 
-	const handleInputClick = () => {
-		inputRef.current?.select()
+	const handleInputClick = (e: React.MouseEvent<HTMLInputElement>) => {
+		e.currentTarget.select()
 	}
 
 	const handleCollectionStatsRefetch = () => {
 		refetchCollectionStats()
 	}
 
+	const handleSalePriceChange = (e: ChangeEvent<HTMLInputElement>) => {
+		const { valueAsNumber } = e.currentTarget
+		const saleFee = valueAsNumber * ((osFee + collectionRoyalty) / 100)
+		const newProfit = valueAsNumber - saleFee - (txValue + txFee)
+
+		setProfit(Number(newProfit.toFixed(4)))
+	}
+
 	useEffect(() => {
 		if (txByHash?.error?.message.length) {
+			console.log(txByHash.error)
 			toast({
 				title: "An error occurred.",
 				description: txByHash.error.message,
@@ -160,14 +179,13 @@ function App() {
 
 			<form onSubmit={handleTxSubmit}>
 				<FormControl mb='3'>
-					<FormLabel>Transaction hash</FormLabel>
 					<InputGroup gridGap='1'>
 						<Input
 							name='txHash'
 							maxLength={66}
 							autoFocus
-							ref={inputRef}
 							onClick={handleInputClick}
+							placeholder='Transaction hash, ex: 0x1234...'
 						/>
 						<Button
 							type='submit'
@@ -178,112 +196,159 @@ function App() {
 					</InputGroup>
 				</FormControl>
 			</form>
-			<Grid
-				gridTemplateColumns={["1fr", "1fr 1fr"]}
-				gridGap='6'
-				w='100%'
-				mb={5}
-			>
-				<VStack align='flex-start'>
-					<StatGroup flexDir='column' gridGap='3'>
-						<Stat>
-							<StatLabel>Value</StatLabel>
-							<StatNumber>
-								{`${txValue} ${ETH_SYMBOL}`}
-							</StatNumber>
-						</Stat>
-						<Stat>
-							<StatLabel>Transaction fee</StatLabel>
-							<StatNumber wordBreak='keep-all'>{`${txFee.toFixed(
-								4
-							)} ${ETH_SYMBOL}`}</StatNumber>
-						</Stat>
-						<Stat>
-							<StatLabel>
-								{`${collectionData?.name} `}Royalty
-							</StatLabel>
-							<StatNumber>{collectionRoyalty}%</StatNumber>
-						</Stat>
-						<Stat>
-							<StatLabel>Platform fee</StatLabel>
-							<StatNumber>{osFee}%</StatNumber>
-						</Stat>
-					</StatGroup>
-				</VStack>
-				<Flex
-					justifyContent='center'
-					gridRow={[1, null]}
-					gridColumn={[null, 2]}
-				>
-					<Box>
-						<Heading size='md'>Derisk amount:</Heading>
-						<Heading size='xl'>
-							{`${deriskAmount} ${ETH_SYMBOL}`}
-						</Heading>
-						<Text fontSize='sm'>
-							List for this amount to recoup purchase cost
-							including fees
-						</Text>
-					</Box>
-				</Flex>
-			</Grid>
 
-			{collectionStats ? (
-				<>
-					<Divider />
-					<Box mt={5}>
+			{txByHash?.result && txReceipt?.result ? (
+				<Grid
+					gridTemplateColumns={["1fr", "1fr 1fr"]}
+					gridGap='6'
+					w='100%'
+					my={5}
+				>
+					<VStack align='flex-start'>
+						<Heading size='md'>Transaction details:</Heading>
+						<StatGroup flexDir='column' gridGap='3'>
+							<Stat>
+								<StatLabel>Value</StatLabel>
+								<StatNumber>
+									{`${txValue} ${ETH_SYMBOL}`}
+								</StatNumber>
+							</Stat>
+							<Stat>
+								<StatLabel>Transaction fee</StatLabel>
+								<StatNumber wordBreak='keep-all'>{`${txFee.toFixed(
+									4
+								)} ${ETH_SYMBOL}`}</StatNumber>
+							</Stat>
+							<Fade in={Boolean(collectionData)}>
+								<Stat>
+									<StatLabel>
+										{`${collectionData?.name} `}Royalty
+									</StatLabel>
+									<StatNumber>
+										{collectionRoyalty}%
+									</StatNumber>
+								</Stat>
+								<Stat>
+									<StatLabel>Platform fee</StatLabel>
+									<StatNumber>{osFee}%</StatNumber>
+								</Stat>
+							</Fade>
+						</StatGroup>
+					</VStack>
+					<Flex
+						flexDir='column'
+						gridRow={[1, null]}
+						gridColumn={[null, 2]}
+						pb={[5, null]}
+						borderBottom={["1px solid gray", "none"]}
+					>
+						<Box mb={4}>
+							<Heading size='md'>Derisk amount:</Heading>
+							<Heading size='xl'>
+								{`${deriskAmount} ${ETH_SYMBOL}`}
+							</Heading>
+							<Text fontSize='sm'>
+								List for this amount to recoup purchase cost
+								including fees
+							</Text>
+						</Box>
+
+						<Fade in={Boolean(collectionData)}>
+							<Box>
+								<Text mb={1}>If you sold for</Text>
+								<InputGroup size='sm'>
+									<Input
+										name='salePrice'
+										type='number'
+										onChange={handleSalePriceChange}
+										placeholder='sale price'
+										mb={1}
+									/>
+									<InputRightAddon title='eth'>
+										{ETH_SYMBOL}
+									</InputRightAddon>
+								</InputGroup>
+								<Text>your total profit would be</Text>
+								<Heading size='md'>{`${
+									profit || 0
+								} ${ETH_SYMBOL}`}</Heading>
+							</Box>
+						</Fade>
+					</Flex>
+				</Grid>
+			) : (
+				<Flex justifyContent='center' py={5} textAlign='center'>
+					<Text fontSize='lg' maxW={400}>
+						Enter a transaction hash/id above to view the
+						transaction details and derisk amount.
+					</Text>
+				</Flex>
+			)}
+
+			<Fade in={Boolean(collectionStats)}>
+				<Divider />
+				<Box mt={5}>
+					<Flex
+						justifyContent='space-between'
+						alignItems='center'
+						mb={3}
+					>
 						<Link
 							href={`https://opensea.io/collection/${collectionData?.collection.slug}`}
 							isExternal
 							_focus={{ outline: "none" }}
 						>
-							<Flex gridGap={3} mb={3} alignItems='flex-end'>
-								<Image
-									src={collectionData?.collection.image_url}
-									boxSize='40px'
-									objectFit='cover'
-									borderRadius='full'
-								/>
-								<Heading size='lg'>
+							<Flex gridGap={3} alignItems='center'>
+								{collectionData?.collection.image_url ? (
+									<Image
+										src={
+											collectionData?.collection.image_url
+										}
+										boxSize='40px'
+										objectFit='cover'
+										borderRadius='full'
+									/>
+								) : null}
+								<Heading size='md'>
 									{collectionData?.name} Stats
 								</Heading>
 							</Flex>
 						</Link>
-						<StatGroup>
-							<Stat>
-								<StatLabel>Items</StatLabel>
-								<StatNumber>
-									{collectionStats.stats.count}
-								</StatNumber>
-							</Stat>
-							<Stat>
-								<StatLabel>Floor</StatLabel>
-								<StatNumber>
-									{`${Number(
-										collectionStats?.stats?.floor_price?.toFixed(
-											4
-										)
-									)} ${ETH_SYMBOL}`}
-								</StatNumber>
-							</Stat>
-							<Stat>
-								<StatLabel>Volume traded</StatLabel>
-								<StatNumber>
-									{`${Math.trunc(
-										collectionStats.stats.total_volume
-									)} ${ETH_SYMBOL}`}
-								</StatNumber>
-							</Stat>
-							<Button
-								onClick={handleCollectionStatsRefetch}
-								isLoading={isRefetchingCollectionStats}
-							>
-								&#8635;
-							</Button>
-						</StatGroup>
-					</Box>
-				</>
-			) : null}
+						<Button
+							onClick={handleCollectionStatsRefetch}
+							isLoading={isRefetchingCollectionStats}
+						>
+							&#8635;
+						</Button>
+					</Flex>
+					<StatGroup gridGap={3}>
+						<Stat>
+							<StatLabel>Items</StatLabel>
+							<StatNumber>
+								{collectionStats?.stats.count}
+							</StatNumber>
+						</Stat>
+						<Stat>
+							<StatLabel>Floor</StatLabel>
+							<StatNumber>
+								{`${Number(
+									collectionStats?.stats?.floor_price?.toFixed(
+										4
+									)
+								)} ${ETH_SYMBOL}`}
+							</StatNumber>
+						</Stat>
+						<Stat>
+							<StatLabel>Volume traded</StatLabel>
+							<StatNumber>
+								{`${Math.trunc(
+									collectionStats?.stats.total_volume || 0
+								)} ${ETH_SYMBOL}`}
+							</StatNumber>
+						</Stat>
+					</StatGroup>
+				</Box>
+			</Fade>
 		</Container>
 	)
 }
