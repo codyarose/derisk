@@ -8,6 +8,8 @@ import {
 	Heading,
 	VStack,
 	Text,
+	Link,
+	Divider,
 } from "@chakra-ui/layout"
 import {
 	Button,
@@ -19,8 +21,9 @@ import {
 	StatLabel,
 	StatNumber,
 	useColorMode,
+	Image,
 } from "@chakra-ui/react"
-import { ChangeEvent, useEffect, useState } from "react"
+import { ChangeEvent, useEffect, useRef, useState } from "react"
 import { useQuery } from "react-query"
 import { utils as ethersUtils, constants as ethersConstants } from "ethers"
 
@@ -31,8 +34,9 @@ function App() {
 	const { colorMode, toggleColorMode } = useColorMode()
 	const toast = createStandaloneToast()
 	const [txHash, setTxHash] = useState("")
+	const inputRef = useRef<HTMLInputElement | null>(null)
 
-	const { data: txByHash, isLoading: isTxByHashLoading } = useQuery(
+	const { data: txByHash, isLoading: isLoadingTxByHash } = useQuery(
 		["txByHash", txHash],
 		() =>
 			fetch(
@@ -43,7 +47,7 @@ function App() {
 		}
 	)
 
-	const { data: txReceipt, isLoading: isTxReceiptLoading } = useQuery(
+	const { data: txReceipt, isLoading: isLoadingTxReceipt } = useQuery(
 		["txReceipt", txHash],
 		() =>
 			fetch(
@@ -59,7 +63,7 @@ function App() {
 		(item: any) => item.data === "0x"
 	).address
 
-	const { data: collectionData } = useQuery(
+	const { data: collectionData } = useQuery<CollectionData>(
 		["collection", contractAddress],
 		() =>
 			fetch(
@@ -67,6 +71,21 @@ function App() {
 			).then((res) => res.json()),
 		{
 			enabled: Boolean(contractAddress),
+		}
+	)
+
+	const {
+		data: collectionStats,
+		isRefetching: isRefetchingCollectionStats,
+		refetch: refetchCollectionStats,
+	} = useQuery<{ stats: CollectionStats }>(
+		["stats", collectionData?.collection.slug],
+		() =>
+			fetch(
+				`https://api.opensea.io/api/v1/collection/${collectionData?.collection.slug}/stats`
+			).then((res) => res.json()),
+		{
+			enabled: Boolean(collectionData),
 		}
 	)
 
@@ -94,6 +113,16 @@ function App() {
 			(e.currentTarget.elements.namedItem("txHash") as HTMLInputElement)
 				.value
 		)
+
+		inputRef.current?.focus()
+	}
+
+	const handleInputClick = () => {
+		inputRef.current?.select()
+	}
+
+	const handleCollectionStatsRefetch = () => {
+		refetchCollectionStats()
 	}
 
 	useEffect(() => {
@@ -113,7 +142,7 @@ function App() {
 			display='flex'
 			justifyContent='center'
 			flexDir='column'
-			py={["3rem", "5rem"]}
+			py={["1rem", "3rem"]}
 		>
 			<Button
 				onClick={toggleColorMode}
@@ -125,28 +154,37 @@ function App() {
 				{colorMode === "light" ? <MoonIcon /> : <SunIcon />}
 			</Button>
 
-			<Grid gridTemplateColumns={["1fr", "1fr 1fr"]} gridGap='6' w='100%'>
+			<Box as='header' mb={5}>
+				<Heading>derisk.tools</Heading>
+			</Box>
+
+			<form onSubmit={handleTxSubmit}>
+				<FormControl mb='3'>
+					<FormLabel>Transaction hash</FormLabel>
+					<InputGroup gridGap='1'>
+						<Input
+							name='txHash'
+							maxLength={66}
+							autoFocus
+							ref={inputRef}
+							onClick={handleInputClick}
+						/>
+						<Button
+							type='submit'
+							isLoading={isLoadingTxByHash || isLoadingTxReceipt}
+						>
+							Submit
+						</Button>
+					</InputGroup>
+				</FormControl>
+			</form>
+			<Grid
+				gridTemplateColumns={["1fr", "1fr 1fr"]}
+				gridGap='6'
+				w='100%'
+				mb={5}
+			>
 				<VStack align='flex-start'>
-					<form onSubmit={handleTxSubmit}>
-						<FormControl mb='3'>
-							<FormLabel>Transaction hash</FormLabel>
-							<InputGroup gridGap='1'>
-								<Input
-									name='txHash'
-									maxLength={66}
-									// minLength={66}
-								/>
-								<Button
-									type='submit'
-									isLoading={
-										isTxByHashLoading || isTxReceiptLoading
-									}
-								>
-									Submit
-								</Button>
-							</InputGroup>
-						</FormControl>
-					</form>
 					<StatGroup flexDir='column' gridGap='3'>
 						<Stat>
 							<StatLabel>Value</StatLabel>
@@ -179,7 +217,9 @@ function App() {
 				>
 					<Box>
 						<Heading size='md'>Derisk amount:</Heading>
-						<Heading size='xl'>{deriskAmount}</Heading>
+						<Heading size='xl'>
+							{`${deriskAmount} ${ETH_SYMBOL}`}
+						</Heading>
 						<Text fontSize='sm'>
 							List for this amount to recoup purchase cost
 							including fees
@@ -187,8 +227,81 @@ function App() {
 					</Box>
 				</Flex>
 			</Grid>
+
+			{collectionStats ? (
+				<>
+					<Divider />
+					<Box mt={5}>
+						<Link
+							href={`https://opensea.io/collection/${collectionData?.collection.slug}`}
+							isExternal
+							_focus={{ outline: "none" }}
+						>
+							<Flex gridGap={3} mb={3} alignItems='flex-end'>
+								<Image
+									src={collectionData?.collection.image_url}
+									boxSize='40px'
+									objectFit='cover'
+									borderRadius='full'
+								/>
+								<Heading size='lg'>
+									{collectionData?.name} Stats
+								</Heading>
+							</Flex>
+						</Link>
+						<StatGroup>
+							<Stat>
+								<StatLabel>Items</StatLabel>
+								<StatNumber>
+									{collectionStats.stats.count}
+								</StatNumber>
+							</Stat>
+							<Stat>
+								<StatLabel>Floor</StatLabel>
+								<StatNumber>
+									{`${Number(
+										collectionStats?.stats?.floor_price?.toFixed(
+											4
+										)
+									)} ${ETH_SYMBOL}`}
+								</StatNumber>
+							</Stat>
+							<Stat>
+								<StatLabel>Volume traded</StatLabel>
+								<StatNumber>
+									{`${Math.trunc(
+										collectionStats.stats.total_volume
+									)} ${ETH_SYMBOL}`}
+								</StatNumber>
+							</Stat>
+							<Button
+								onClick={handleCollectionStatsRefetch}
+								isLoading={isRefetchingCollectionStats}
+							>
+								&#8635;
+							</Button>
+						</StatGroup>
+					</Box>
+				</>
+			) : null}
 		</Container>
 	)
 }
 
 export default App
+
+type CollectionData = {
+	name: string
+	dev_seller_fee_basis_points: number
+	opensea_seller_fee_basis_points: number
+	collection: {
+		image_url: string
+		slug: string
+	}
+}
+
+type CollectionStats = {
+	count: number
+	floor_price: number
+	total_volume: number
+}
