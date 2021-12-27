@@ -37,6 +37,7 @@ function App() {
 	const toast = createStandaloneToast()
 	const [txHash, setTxHash] = useState("")
 	const [profit, setProfit] = useState(0)
+	const [isUnknownContract, setIsUnknownContract] = useState(false)
 
 	const { data: txByHash, isLoading: isLoadingTxByHash } = useQuery(
 		["txByHash", txHash],
@@ -73,6 +74,13 @@ function App() {
 			).then((res) => res.json()),
 		{
 			enabled: Boolean(contractAddress),
+			onSuccess: (data) => {
+				if (data.asset_contract_type === "unknown") {
+					setIsUnknownContract(true)
+				} else {
+					setIsUnknownContract(false)
+				}
+			},
 		}
 	)
 
@@ -81,10 +89,10 @@ function App() {
 		isRefetching: isRefetchingCollectionStats,
 		refetch: refetchCollectionStats,
 	} = useQuery<{ stats: CollectionStats }>(
-		["stats", collectionData?.collection.slug],
+		["stats", collectionData?.collection?.slug],
 		() =>
 			fetch(
-				`https://api.opensea.io/api/v1/collection/${collectionData?.collection.slug}/stats`
+				`https://api.opensea.io/api/v1/collection/${collectionData?.collection?.slug}/stats`
 			).then((res) => res.json()),
 		{
 			enabled: Boolean(collectionData),
@@ -222,15 +230,20 @@ function App() {
 							<Fade in={Boolean(collectionData)}>
 								<Stat>
 									<StatLabel>
-										{`${collectionData?.name} `}Royalty
+										{`${collectionData?.name} `}
+										Royalty
 									</StatLabel>
 									<StatNumber>
-										{collectionRoyalty}%
+										{isUnknownContract
+											? "--"
+											: `${collectionRoyalty}%`}
 									</StatNumber>
 								</Stat>
 								<Stat>
 									<StatLabel>Platform fee</StatLabel>
-									<StatNumber>{osFee}%</StatNumber>
+									<StatNumber>
+										{isUnknownContract ? "--" : `${osFee}%`}
+									</StatNumber>
 								</Stat>
 							</Fade>
 						</StatGroup>
@@ -285,70 +298,73 @@ function App() {
 				</Flex>
 			)}
 
-			<Fade in={Boolean(collectionStats)}>
-				<Divider />
-				<Box mt={5}>
-					<Flex
-						justifyContent='space-between'
-						alignItems='center'
-						mb={3}
-					>
-						<Link
-							href={`https://opensea.io/collection/${collectionData?.collection.slug}`}
-							isExternal
-							_focus={{ outline: "none" }}
+			{collectionData?.collection && collectionStats ? (
+				<Fade in={Boolean(collectionStats)}>
+					<Divider />
+					<Box mt={5}>
+						<Flex
+							justifyContent='space-between'
+							alignItems='center'
+							mb={3}
 						>
-							<Flex gridGap={3} alignItems='center'>
-								{collectionData?.collection.image_url ? (
-									<Image
-										src={
-											collectionData?.collection.image_url
-										}
-										boxSize='40px'
-										objectFit='cover'
-										borderRadius='full'
-									/>
-								) : null}
-								<Heading size='md'>
-									{collectionData?.name} Stats
-								</Heading>
-							</Flex>
-						</Link>
-						<Button
-							onClick={handleCollectionStatsRefetch}
-							isLoading={isRefetchingCollectionStats}
-						>
-							&#8635;
-						</Button>
-					</Flex>
-					<StatGroup gridGap={3}>
-						<Stat>
-							<StatLabel>Items</StatLabel>
-							<StatNumber>
-								{collectionStats?.stats.count}
-							</StatNumber>
-						</Stat>
-						<Stat>
-							<StatLabel>Floor</StatLabel>
-							<StatNumber>
-								{`${Number(
-									collectionStats?.stats?.floor_price?.toFixed(
-										4
-									)
-								)} ${ETH_SYMBOL}`}
-							</StatNumber>
-						</Stat>
-						<Stat>
-							<StatLabel>Volume traded</StatLabel>
-							<StatNumber>
-								{`${Math.trunc(
-									collectionStats?.stats.total_volume || 0
-								)} ${ETH_SYMBOL}`}
-							</StatNumber>
-						</Stat>
-					</StatGroup>
-				</Box>
-			</Fade>
+							<Link
+								href={`https://opensea.io/collection/${collectionData?.collection?.slug}`}
+								isExternal
+								_focus={{ outline: "none" }}
+							>
+								<Flex gridGap={3} alignItems='center'>
+									{collectionData?.collection?.image_url ? (
+										<Image
+											src={
+												collectionData?.collection
+													.image_url
+											}
+											boxSize='40px'
+											objectFit='cover'
+											borderRadius='full'
+										/>
+									) : null}
+									<Heading size='md'>
+										{collectionData?.name} Stats
+									</Heading>
+								</Flex>
+							</Link>
+							<Button
+								onClick={handleCollectionStatsRefetch}
+								isLoading={isRefetchingCollectionStats}
+							>
+								&#8635;
+							</Button>
+						</Flex>
+						<StatGroup gridGap={3}>
+							<Stat>
+								<StatLabel>Items</StatLabel>
+								<StatNumber>
+									{collectionStats?.stats.count}
+								</StatNumber>
+							</Stat>
+							<Stat>
+								<StatLabel>Floor</StatLabel>
+								<StatNumber>
+									{`${Number(
+										collectionStats?.stats?.floor_price?.toFixed(
+											4
+										)
+									)} ${ETH_SYMBOL}`}
+								</StatNumber>
+							</Stat>
+							<Stat>
+								<StatLabel>Volume traded</StatLabel>
+								<StatNumber>
+									{`${Math.trunc(
+										collectionStats?.stats.total_volume || 0
+									)} ${ETH_SYMBOL}`}
+								</StatNumber>
+							</Stat>
+						</StatGroup>
+					</Box>
+				</Fade>
+			) : null}
 		</Container>
 	)
 }
@@ -359,6 +375,7 @@ type CollectionData = {
 	name: string
 	dev_seller_fee_basis_points: number
 	opensea_seller_fee_basis_points: number
+	asset_contract_type: string | "unknown"
 	collection: {
 		image_url: string
 		slug: string
