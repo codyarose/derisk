@@ -1,3 +1,6 @@
+import { ChangeEvent, useEffect, useState } from "react"
+import { useQuery } from "react-query"
+import { utils as ethersUtils, constants as ethersConstants } from "ethers"
 import { FormControl } from "@chakra-ui/form-control"
 import { MoonIcon, SunIcon } from "@chakra-ui/icons"
 import {
@@ -25,9 +28,7 @@ import {
 	InputRightAddon,
 	Fade,
 } from "@chakra-ui/react"
-import { ChangeEvent, useEffect, useRef, useState } from "react"
-import { useQuery } from "react-query"
-import { utils as ethersUtils, constants as ethersConstants } from "ethers"
+import { useTxHash } from "./hooks/useTxHash"
 
 const API_KEY = "FGTV43W5R7J9XW6JTITDED34FITIPDFB95"
 const ETH_SYMBOL = ethersConstants.EtherSymbol
@@ -35,7 +36,7 @@ const ETH_SYMBOL = ethersConstants.EtherSymbol
 function App() {
 	const { colorMode, toggleColorMode } = useColorMode()
 	const toast = createStandaloneToast()
-	const [txHash, setTxHash] = useState("")
+	const { txHash, updateTxHash } = useTxHash()
 	const [profit, setProfit] = useState(0)
 	const [isUnknownContract, setIsUnknownContract] = useState(false)
 
@@ -123,13 +124,10 @@ function App() {
 			e.currentTarget.elements.namedItem("txHash") as HTMLInputElement
 		).value
 
-		setTxHash((prevTxHash) => {
-			if (prevTxHash === newTxHash) {
-				return prevTxHash
-			}
-
-			setProfit(0)
-			return newTxHash
+		updateTxHash(newTxHash, {
+			onUpdate: () => {
+				setProfit(0)
+			},
 		})
 
 		e.currentTarget.focus()
@@ -193,6 +191,7 @@ function App() {
 							maxLength={66}
 							autoFocus
 							onClick={handleInputClick}
+							defaultValue={txHash}
 							placeholder='Transaction hash, ex: 0x1234...'
 						/>
 						<Button
