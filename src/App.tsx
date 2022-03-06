@@ -29,6 +29,8 @@ import {
 	Fade,
 } from "@chakra-ui/react"
 import { useTxHash } from "./hooks/useTxHash"
+// import useProvider from "./hooks/useProvider"
+import useContract from "./hooks/useOS"
 
 const API_KEY = "FGTV43W5R7J9XW6JTITDED34FITIPDFB95"
 const ETH_SYMBOL = ethersConstants.EtherSymbol
@@ -39,6 +41,14 @@ function App() {
 	const { txHash, updateTxHash } = useTxHash()
 	const [profit, setProfit] = useState(0)
 	const [isUnknownContract, setIsUnknownContract] = useState(false)
+
+	// const provider = useProvider()
+	// console.log({provider})
+	
+	const events = useContract()
+	// console.log(events ? events.then(data => data && data[0].getTransactionReceipt()) : null)
+	console.log(events)
+
 
 	const { data: txByHash, isLoading: isLoadingTxByHash } = useQuery(
 		["txByHash", txHash],
@@ -386,3 +396,16 @@ type CollectionStats = {
 	floor_price: number
 	total_volume: number
 }
+
+// fetch all nfts from address
+// select nft to get all transactions to/from contract address
+// also manual contract address input
+
+// fetch all erc721 transfers from address
+// https://api.etherscan.io/api?module=account&action=tokennfttx&address=0xD4281868E1868840F0911d99DD5e387A46de5d8d&page=1&offset=1000&startblock=0&endblock=27025780&sort=asc&apikey=FGTV43W5R7J9XW6JTITDED34FITIPDFB95
+// filter duplicate items 
+// display in list of items
+// select item
+// loop over all transactions matching item's contract address to fetch based on hash
+// tally up inflows/outflows
+// display
